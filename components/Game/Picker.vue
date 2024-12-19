@@ -20,7 +20,7 @@
     </div>
     <!-- 输入框区 -->
     <div class="flex gap-x-2">
-      <div v-for="item in currentData" :key="item.type">
+      <div v-for="item in steps" :key="item.type">
         <el-input
           :model-value="item.label"
           :placeholder="`请选择${item.typeName}`"
@@ -29,15 +29,32 @@
         />
       </div>
     </div>
+    <!-- <el-form inline>
+      <el-form-item v-for="step in steps" :prop="step.type">
+        <el-input
+          :model-value="step.label"
+          :placeholder="`请选择${step.typeName}`"
+          :suffix-icon="ArrowDown"
+          @click="handleInputClick(step.type)"
+        />
+      </el-form-item>
+    </el-form> -->
     <!-- 内容面板分组 -->
     <div class="game-panel-group drop-shadow mt-1 absolute z-9999">
       <!-- 面板组件 -->
-      <GamePanel
+      <!-- <GamePanel
         v-for="item in currentData"
         v-show="currentType === item.type"
         :key="item.type"
         :data="item.options"
         :type="item.type"
+        @item-click="handleItemClick"
+        @close="handlePanelClose"
+      /> -->
+      <GamePanel
+        v-if="currentType"
+        :data="currentItem"
+        :type="currentType"
         @item-click="handleItemClick"
         @close="handlePanelClose"
       />
@@ -113,55 +130,99 @@ const isCompleted = computed(() => {
  * [核心]
  * 计算组件展示数据
  */
-const currentData = computed((): GamePicker.OptionVM[] => {
-  const options: GamePicker.SimpleOptionVM[] = games.value.map((m) => ({
-    label: m.name,
-    value: m.id,
-    initial: m.initial,
-    type: "game",
-    hot: m.hot,
-  }));
-  const arr: GamePicker.OptionVM[] = [
-    {
-      label: selected.value.find((m) => m.type === "game")?.label,
-      value: selected.value.find((m) => m.type === "game")?.value,
-      type: "game",
-      typeName: "游戏",
-      hot: false,
-      initial: "",
-      options,
-    },
-  ];
-  for (const type of types.value) {
-    if(type === 'game')
-      {
-        continue
-      }
-      const selectedItemOfType = selected.value.find((m) => m.type === type);
-      // FIXME: value 的值是所有 type 的值，应该根据上级过滤
-      let value = nodes.value.filter(m=>m.type === type)||[]
-      arr.push({
-      label: selectedItemOfType?.label,
-      value: selectedItemOfType?.value,
-      type,
-      typeName: '',
-      hot: false,
-      initial: "",
-      options: _.sortBy(
-        value.map((m) => ({
-          label: m.name,
-          value: m.id,
-          initial: m.initial,
-          type: m.type,
-          hot: m.hot,
-          sort: m.sort,
-        })),
-        "sort"
-      ),
-    });
+// const currentData = computed((): GamePicker.OptionVM[] => {
+//   const options: GamePicker.SimpleOptionVM[] = games.value.map((m) => ({
+//     label: m.name,
+//     value: m.id,
+//     initial: m.initial,
+//     type: "game",
+//     hot: m.hot,
+//   }));
+//   const arr: GamePicker.OptionVM[] = [
+//     {
+//       label: selected.value.find((m) => m.type === "game")?.label,
+//       value: selected.value.find((m) => m.type === "game")?.value,
+//       type: "game",
+//       typeName: "游戏",
+//       hot: false,
+//       initial: "",
+//       options,
+//     },
+//   ];
+//   for (const type of types.value) {
+//     if(type === 'game')
+//       {
+//         continue
+//       }
+//       const selectedItemOfType = selected.value.find((m) => m.type === type);
+
+//       // FIXME: value 的值是所有 type 的值，应该根据上级过滤
+//       let value = nodes.value.filter(m=>m.type === type)||[]
+//       arr.push({
+//       label: selectedItemOfType?.label,
+//       value: selectedItemOfType?.value,
+//       type,
+//       typeName: '',
+//       hot: false,
+//       initial: "",
+//       options: _.sortBy(
+//         value.map((m) => ({
+//           label: m.name,
+//           value: m.id,
+//           initial: m.initial,
+//           type: m.type,
+//           hot: m.hot,
+//           sort: m.sort,
+//         })),
+//         "sort"
+//       ),
+//     });
+//   }
+//   return arr;
+// });
+
+const steps = computed(():GamePicker.SimpleOptionVM[]=>{
+  return types.value.map(m=>{
+    const selectedItem= selected.value.find(c=>c.type=== m)
+    return {
+      label:selectedItem?.label,
+      value:selectedItem?.value,
+      type:m,
+      typeName:m,
+      hot:selectedItem?.hot||false
+    }
+  })
+})
+
+const preType = computed(()=>{
+  const currTypeIndex = types.value.findIndex(m=>m === currentType.value);
+return  types.value[currTypeIndex-1<0?0:currTypeIndex-1]
+})
+
+const preStep = computed(()=>{
+return selected.value.find(m=>m.type===preType.value);
+})
+
+// game region server camp
+const currentItem = computed(():GamePicker.OptionVM[]=>{
+
+  let nodesWithType = nodes.value.filter(m=>m.type === currentType.value);
+  if(preStep.value && preType.value !== 'game'){
+    console.log("[game picker] nodesWithType",nodesWithType,preStep.value)
+    nodesWithType = nodesWithType.filter(m=>m.parentId == (preStep.value?.value||0));
   }
-  return arr;
-});
+  return nodesWithType.map(m=>{
+    return {
+      label:m.name,
+      value:m.id,
+      initial:m.initial,
+      hot:m.hot,
+      type:m.type,
+      typeName:m.typeName,
+      options:[]
+    }
+  })
+})
 
 /**
  * 所有的数据项类型
@@ -324,8 +385,8 @@ async function setDefaultValue(params?: KV<number>[]) {
 }
 
 onMounted(()=>{
-  // console.log("onMounted",model.value)
-  // setDefaultValue(model.value)
+  console.log("onMounted",model.value)
+  setDefaultValue(model.value)
   setDefaultValueWithQuery()
 })
 

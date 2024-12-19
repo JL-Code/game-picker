@@ -99,8 +99,8 @@ function flatten(nodes: TreeNode[]): TreeNode[] {
     if (Array.isArray(node.children)) {
       // 将子节点入栈
       stack.push(...node.children);
-      // 移除 children 引用
-      node.children = null;
+      // // 移除 children 引用
+      // node.children = null;
     }
   }
 
